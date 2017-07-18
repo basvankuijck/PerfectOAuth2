@@ -38,20 +38,19 @@ import StORM
 ///            override public func to(_ this: StORMRow) {
 ///                id = Int(exactly: this.data["id"] as? Int32 ?? 0) ?? 0
 ///                userID = Int(exactly: this.data["userID"] as? Int32 ?? 0) ?? 0
-///                accessToken = stringValue(from: this.data["accessToken"]) ?? ""
-///                refreshToken = stringValue(from: this.data["refreshToken"]) ?? ""
+///                accessToken = (this.data["accessToken"] as? String) ?? ""
+///                refreshToken = (this.data["refreshToken"] as? String) ?? ""
+///                scope = (this.data["scope"] as? String) ?? ""
 ///
-///                if let dateString = stringValue(from: this.data["accessTokenExpirationDate"]),
+///                if let dateString = this.data["accessTokenExpirationDate"] as? String,
 ///                    let date = DateFormatter.mySQL.date(from: dateString) {
 ///                    accessTokenExpirationDate = date
 ///                }
 ///
-///                if let dateString = stringValue(from: this.data["refreshTokenExpirationDate"]),
+///                if let dateString = this.data["refreshTokenExpirationDate"] as? String,
 ///                    let date = DateFormatter.mySQL.date(from: dateString) {
 ///                    refreshTokenExpirationDate = date
 ///                }
-///
-///                scope = stringValue(from: this.data["scope"]) ?? ""
 ///            }
 ///        }
 ///        
