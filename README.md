@@ -107,7 +107,7 @@ class AccessToken: MySQLStORM, StORMAccessToken {
         id = (this.data["id"] as? Int) ?? 0
         userID = (this.data["userID"] as? Int) ?? 0
         scope = (this.data["scope"] as? String) ?? ""
-        refreshToken = (this.data["refreshToken"] as? String) ?? ""
+        accessToken = (this.data["accessToken"] as? String) ?? ""
         refreshToken = (this.data["refreshToken"] as? String) ?? ""
 
         if let dateString = this.data["accessTokenExpirationDate"] as? String,
