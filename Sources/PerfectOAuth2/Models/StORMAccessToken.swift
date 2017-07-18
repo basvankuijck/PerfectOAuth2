@@ -40,12 +40,16 @@ extension StORMAccessToken {
     }
 
     public var json: [String: Any?] {
-        return [
+        var ret: [String: Any?] = [
             "access_token" : accessToken,
             "refresh_token": refreshToken,
             "expires_in": Int(accessTokenExpirationDate.timeIntervalSince(Date())),
             "token_type": TokenType.bearer.rawValue,
-            "scope": scope.characters.count > 0 ? scope : nil
+            "scope": nil
         ]
+        if scope.characters.count > 0 {
+            ret["scope"] = scope
+        }
+        return ret
     }
 }
