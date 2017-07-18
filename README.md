@@ -8,7 +8,7 @@ Creates and utilizes an OAuth2 implementation on your Perfect webserver.
 ## Example
 
 ###  `main.swift`
-```
+```swift
 import PerfectLib
 import PerfectHTTP
 import PerfectHTTPServer
@@ -85,7 +85,7 @@ do {
 
 ### `AccessToken.swift`
 
-```
+```swift
 import Foundation
 import StORM
 import MySQLStORM
