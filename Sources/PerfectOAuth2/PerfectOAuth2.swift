@@ -73,7 +73,7 @@ import StORM
 open class PerfectOAuth2<T: StORMAccessToken> {
 
     public init() {
-        Logger.info(message: "PerfectOAuth2 initialized")
+        LogFile.info("PerfectOAuth2 initialized")
         try? T.init().setup("")
     }
 
@@ -123,7 +123,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     /// - Returns: `AccessToken`. Returns the `AccessToken` that is used to authorize / authenticate.
     /// - Throws: See `OAuthError`
     @discardableResult open func authorize(request: HTTPRequest, scopes: [String]?=nil) throws -> T {
-        Logger.debug(message: "PerfectOAuth2: validating authorization in request \(String(describing: request))")
+        LogFile.debug("PerfectOAuth2: Validating authorization in request \(request.method) \(request.path)")
         guard let authorization = request.header(.authorization) else {
             throw OAuthError.accessDenied
         }
@@ -135,33 +135,35 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 throw OAuthError.accessDenied
         }
 
-        let accesToken = T.init()
+        let accessToken = T.init()
 
         let findObj = [
             "accessToken": accessTokenString
         ]
         do {
-            try accesToken.find(findObj)
-            if accesToken.id == 0 {
+            try accessToken.find(findObj)
+            if accessToken.id == 0 {
                 Log.error(message: "PerfectOAuth2: Cannot find access_token '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
             if let scopes = scopes {
-                if !accesToken.has(scopes: scopes) {
+                if !accessToken.has(scopes: scopes) {
+                    Log.error(message: "PerfectOAuth2: \(String(describing: accessToken)) does not have the correct scopes: \(scopes)")
                     throw OAuthError.invalidScope(scopes)
                 }
             }
 
             let now = Date()
-            if accesToken.accessTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970
-                || accesToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
-                if accesToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
-                    try invalidate(accessToken: accesToken)
+            if accessToken.accessTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970
+                || accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
+                if accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
+                    Log.error(message: "PerfectOAuth2: refresh_token is expired")
+                    try invalidate(accessToken: accessToken)
                 }
                 Log.warning(message: "PerfectOAuth2: access_token is expired '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
-            return accesToken
+            return accessToken
         } catch let error {
             Log.error(message: "PerfectOAuth2: Authorize error: \(error)")
             throw error
@@ -213,6 +215,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 }
 
                 guard let grantType = OAuthGrantType(rawValue: grantTypeString) else {
+                    Log.error(message: "PerfectOAuth2: Invalid grant_type: \(grantTypeString)")
                     throw OAuthError.invalidGrantType
                 }
 
@@ -224,6 +227,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                         authorizationBasic.first == TokenType.basic.rawValue,
                         let base64EncodedData = Data(base64Encoded: base64EncodedString),
                         let base64DecodedString = String(data: base64EncodedData, encoding: .utf8) else {
+                            Log.error(message: "PerfectOAuth2: Missing 'Authorization: Basic <base64_encoded>' header")
                             throw OAuthError.invalidClient
                     }
                     
@@ -234,15 +238,17 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                             throw OAuthError.invalidClient
                     }
                     
-                    Logger.debug(message: "PerfectOAuth2: Checking client_id and client_secret from 'Authorization' header")
+                    LogFile.debug("PerfectOAuth2: Checking client_id and client_secret from 'Authorization' header")
                     if authClosure(grantType, clientID, clientSecret) == false {
+                        Log.error(message: "PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
                         throw OAuthError.invalidClient
                     }
                     
                 // client_id and client_secret are send through regular post values
                 } else if let clientID = request.param(name: "client_id"), let clientSecret = request.param(name: "client_secret") {
-                    Logger.debug(message: "PerfectOAuth2: Checking client_id and client_secret from post parameters")
+                    LogFile.debug("PerfectOAuth2: Checking client_id and client_secret from POST request parameters")
                     if authClosure(grantType, clientID, clientSecret) == false {
+                        Log.error(message: "PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
                         throw OAuthError.invalidClient
                     }
                 }
@@ -258,6 +264,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                             throw OAuthError.missingParameters(["username", "password"])
                     }
                     guard let tuserID = userClosure?(username, password) else {
+                        Log.error(message: "PerfectOAuth2: Invalid username (\(username)) and/or password (***)")
                         throw OAuthError.invalidUsernamePassword
                     }
                     userID = tuserID
@@ -282,7 +289,8 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                     accessToken.scope = scope ?? ""
                     try accessToken.save { id in accessToken.id = id as! Int }
                     response.setHeader(.contentType, value: "application/json")
-                    
+
+                    LogFile.info("PerfectOAuth2: Generated \(String(describing: accessToken))")
                     try response.setBody(json: accessToken.json)
                 } catch let error {
                     throw error
@@ -300,22 +308,24 @@ open class PerfectOAuth2<T: StORMAccessToken> {
 
     fileprivate func authorize(refreshToken: String) throws -> T {
 
-        let accesToken = T.init()
+        let accessToken = T.init()
 
         let findObj = [
             "refreshToken": refreshToken
         ]
         do {
-            try accesToken.find(findObj)
-            if accesToken.id == 0 {
+            try accessToken.find(findObj)
+            if accessToken.id == 0 {
+                Log.error(message: "PerfectOAuth2: Cannot find an access_token with the refresh_token \(refreshToken)")
                 throw OAuthError.invalidRefreshToken
             }
             let now = Date()
-            if accesToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
-                try invalidate(accessToken: accesToken)
+            if accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
+                try invalidate(accessToken: accessToken)
+                Log.error(message: "PerfectOAuth2: refresh_token is expired")
                 throw OAuthError.invalidRefreshToken
             }
-            return accesToken
+            return accessToken
         } catch {
             throw OAuthError.invalidRefreshToken
         }
@@ -326,7 +336,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     /// - Parameter accessToken: `AccessToken`
     /// - Throws: If for some reason the accessToken cannot be removed. An error will be thrown.
     public func invalidate(accessToken: T) throws {
-        Logger.debug(message: "PerfectOAuth2: invalidate access_token \(accessToken.accessToken)")
+        LogFile.debug("PerfectOAuth2: Invalidate access_token \(accessToken.accessToken)")
         try accessToken.delete()
     }
 }

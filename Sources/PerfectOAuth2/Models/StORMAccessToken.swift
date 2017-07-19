@@ -17,7 +17,7 @@ public protocol StORMConvenience: class {
     func delete() throws
 }
 
-public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, StORMProtocol {
+public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, StORMProtocol, CustomStringConvertible {
     var id: Int { get set }
     var userID: Int { get set }
     var accessToken: String { get set }
@@ -52,5 +52,9 @@ extension StORMAccessToken {
             ret["scope"] = scope
         }
         return ret
+    }
+
+    public var description: String {
+        return "<\(type(of: self))> [ id: \(id), userID: \(userID), accessToken: \(accessToken), refreshToken: \(refreshToken), scope: \(scope), accessTokenExpirationDate: \(accessTokenExpirationDate), refreshTokenExpirationDate: \(refreshTokenExpirationDate) ]"
     }
 }
