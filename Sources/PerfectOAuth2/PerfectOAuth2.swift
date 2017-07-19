@@ -10,6 +10,7 @@ import PerfectLib
 import PerfectHTTP
 import PerfectHTTPServer
 import Foundation
+import PerfectLogger
 import StORM
 
 /// Create a Perfect OAuth2 Handler with an `StORMAccessToken` generic
@@ -72,6 +73,7 @@ import StORM
 open class PerfectOAuth2<T: StORMAccessToken> {
 
     public init() {
+        Logger.info(message: "PerfectOAuth2 initialized")
         try? T.init().setup("")
     }
 
@@ -121,6 +123,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     /// - Returns: `AccessToken`. Returns the `AccessToken` that is used to authorize / authenticate.
     /// - Throws: See `OAuthError`
     @discardableResult open func authorize(request: HTTPRequest, scopes: [String]?=nil) throws -> T {
+        Logger.debug(message: "PerfectOAuth2: validating authorization in request \(String(describing: request))")
         guard let authorization = request.header(.authorization) else {
             throw OAuthError.accessDenied
         }
@@ -140,7 +143,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
         do {
             try accesToken.find(findObj)
             if accesToken.id == 0 {
-                print("Cannot find access_token '\(accessTokenString)'")
+                Log.error(message: "PerfectOAuth2: Cannot find access_token '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
             if let scopes = scopes {
@@ -155,12 +158,12 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 if accesToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
                     try invalidate(accessToken: accesToken)
                 }
-                print("access_token is expired '\(accessTokenString)'")
+                Log.warning(message: "PerfectOAuth2: access_token is expired '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
             return accesToken
         } catch let error {
-            print("Authorize error: \(error)")
+            Log.error(message: "PerfectOAuth2: Authorize error: \(error)")
             throw error
         }
     }
@@ -231,13 +234,14 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                             throw OAuthError.invalidClient
                     }
                     
-                    
+                    Logger.debug(message: "PerfectOAuth2: Checking client_id and client_secret from 'Authorization' header")
                     if authClosure(grantType, clientID, clientSecret) == false {
                         throw OAuthError.invalidClient
                     }
                     
                 // client_id and client_secret are send through regular post values
                 } else if let clientID = request.param(name: "client_id"), let clientSecret = request.param(name: "client_secret") {
+                    Logger.debug(message: "PerfectOAuth2: Checking client_id and client_secret from post parameters")
                     if authClosure(grantType, clientID, clientSecret) == false {
                         throw OAuthError.invalidClient
                     }
@@ -268,7 +272,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                     scope = accessToken.scope
                     try self.invalidate(accessToken: accessToken)
                     
-                default:
+                case .authorizationCode:
                     break
                 }
 
@@ -286,8 +290,11 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 
                 response.completed()
             } catch let error as OAuthError {
+                Log.error(message: "PerfectOAuth2: error: \(error)")
                 response.throw(with: error)
-            } catch { }
+            } catch let error {
+                Log.error(message: "PerfectOAuth2: error: \(error)")
+            }
         }
     }
 
@@ -319,6 +326,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     /// - Parameter accessToken: `AccessToken`
     /// - Throws: If for some reason the accessToken cannot be removed. An error will be thrown.
     public func invalidate(accessToken: T) throws {
+        Logger.debug(message: "PerfectOAuth2: invalidate access_token \(accessToken.accessToken)")
         try accessToken.delete()
     }
 }

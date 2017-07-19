@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import StORM
 
 public protocol StORMConvenience: class {
     init()
@@ -16,7 +17,7 @@ public protocol StORMConvenience: class {
     func delete() throws
 }
 
-public protocol StORMAccessToken: StORMConvenience, JSONRepresentable {
+public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, StORMProtocol {
     var id: Int { get set }
     var userID: Int { get set }
     var accessToken: String { get set }
