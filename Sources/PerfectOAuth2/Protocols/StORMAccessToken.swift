@@ -9,15 +9,7 @@
 import Foundation
 import StORM
 
-public protocol StORMConvenience: class {
-    init()
-    func find(_ data: [String: Any]) throws
-    func save(set: (_ id: Any)->Void) throws
-    func setup(_ str: String) throws
-    func delete() throws
-}
-
-public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, StORMProtocol, CustomStringConvertible {
+public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, CustomStringConvertible {
     var id: Int { get set }
     var userID: Int { get set }
     var accessToken: String { get set }
@@ -40,8 +32,8 @@ extension StORMAccessToken {
             .count == scopes.count
     }
 
-    public var json: [String: Any?] {
-        var ret: [String: Any?] = [
+    public var json: JSONObjectOptionalValue {
+        var ret: JSONObjectOptionalValue = [
             "access_token" : accessToken,
             "refresh_token": refreshToken,
             "expires_in": Int(accessTokenExpirationDate.timeIntervalSince(Date())),

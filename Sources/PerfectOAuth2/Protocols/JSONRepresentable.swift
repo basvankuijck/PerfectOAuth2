@@ -8,6 +8,8 @@
 
 import Foundation
 
+public typealias JSONObjectOptionalValue = [String: Any?]
+
 public protocol JSONRepresentable {
-    var json: [String: Any?] { get }
+    var json: JSONObjectOptionalValue { get }
 }
