@@ -13,6 +13,19 @@ import Foundation
 import PerfectLogger
 import StORM
 
+
+/// How should refreshtoken cycles be handled?
+public enum RefreshTokenCycle {
+    /// Once a refresh_token is used the attached access_token is invalidated immediatelly
+    case invalidateImmediatelly
+
+    /// The 'previous' access_token and refresh_token are still valid,
+    ///  useable for a short period of time and a new refresh_token / access_token are generated.
+    /// Once the new access_token is used, the previous one is invalidated.
+    /// This makes sure the user actually gets the new access_token and is using it.
+    case wait
+}
+
 /// Create a Perfect OAuth2 Handler with an `StORMAccessToken` generic
 ///
 /// The generic should conform to the `StORMAccessToken` protocol
@@ -76,6 +89,9 @@ open class PerfectOAuth2<T: StORMAccessToken> {
         LogFile.info("PerfectOAuth2 initialized")
         try? T.init().setup("")
     }
+
+    /// See `RefreshTokenCycle`
+    public var refreshTokenCycle:RefreshTokenCycle = .invalidateImmediatelly
 
     /// See if a `Perfect.HTTPRequest` has the correct authorization.
     ///
@@ -163,6 +179,14 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 Log.warning(message: "PerfectOAuth2: access_token is expired '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
+
+            if accessToken.parentID > 0 {
+                let parentAccessToken = T.init()
+                try parentAccessToken.get(accessToken.parentID)
+                try parentAccessToken.delete()
+                accessToken.parentID = 0
+                try accessToken.update(data: [ ( "parentID", 0) ], idName: "id", idValue: accessToken.id)
+            }
             return accessToken
         } catch let error {
             Log.error(message: "PerfectOAuth2: Authorize error: \(error)")
@@ -231,7 +255,8 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 }
 
                 var scope = request.param(name: "scope")
-                var userID:Int?
+                var userID: Int?
+                var parentAccessTokenID: Int = 0
                 switch (grantType) {
                 case .clientCredentials:
                     break
@@ -254,8 +279,23 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                     let accessToken = try self.authorize(refreshToken: refreshToken)
                     userID = accessToken.userID
                     scope = accessToken.scope
-                    try self.invalidate(accessToken: accessToken)
-                    
+                    switch self.refreshTokenCycle {
+                    case .invalidateImmediatelly:
+                        try self.invalidate(accessToken: accessToken)
+
+                    case .wait:
+                        parentAccessTokenID = accessToken.id
+                        try accessToken.update(data: [ ("refreshTokenExpirationDate", Date(timeIntervalSinceNow: 60*60)) ], idName: "id", idValue: accessToken.id)
+                        let findToken = T.init()
+                        try findToken.find([ "parentID": String(describing: parentAccessTokenID) ])
+                        for row in findToken.results.rows {
+                            let token = T.init()
+                            token.to(row)
+                            try token.delete(token.id)
+                        }
+                    }
+
+
                 case .authorizationCode:
                     break
                 }
@@ -264,6 +304,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                     let accessToken = T.init()
                     accessToken.userID = userID ?? 0
                     accessToken.scope = scope ?? ""
+                    accessToken.parentID = parentAccessTokenID
                     try accessToken.save { id in accessToken.id = id as! Int }
                     response.setHeader(.contentType, value: "application/json")
 

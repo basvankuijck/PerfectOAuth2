@@ -11,6 +11,7 @@ import StORM
 
 public protocol StORMAccessToken: StORMConvenience, JSONRepresentable, CustomStringConvertible {
     var id: Int { get set }
+    var parentID: Int { get set }
     var userID: Int { get set }
     var accessToken: String { get set }
     var refreshToken: String { get set }
