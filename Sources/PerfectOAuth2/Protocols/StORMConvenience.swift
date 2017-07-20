@@ -11,6 +11,8 @@ import StORM
 
 public protocol StORMConvenience: class, StORMProtocol {
     init()
+    
+    var results: StORMResultSet { get set }
     func setup(_ str: String) throws
 
     func find(_ data: [String: Any]) throws
