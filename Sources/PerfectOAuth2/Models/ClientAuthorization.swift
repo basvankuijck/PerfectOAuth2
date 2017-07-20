@@ -11,8 +11,8 @@ import PerfectLogger
 import PerfectHTTP
 
 public struct ClientAuthorization {
-    public var clientID: String
-    public var clientSecret: String
+    public let clientID: String
+    public let clientSecret: String
 
     public init?(request: HTTPRequest) {
         if let authorization = request.header(.authorization) {
@@ -35,6 +35,7 @@ public struct ClientAuthorization {
 
             self.clientID = clientID
             self.clientSecret = clientSecret
+            return
 
             // client_id and client_secret are send through regular post/get values
         } else if let clientID = request.param(name: "client_id"), let clientSecret = request.param(name: "client_secret") {
