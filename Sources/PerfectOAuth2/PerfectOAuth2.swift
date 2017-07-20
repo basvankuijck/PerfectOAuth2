@@ -13,11 +13,6 @@ import Foundation
 import PerfectLogger
 import StORM
 
-public struct ClientAuthorization {
-    public var clientID: String
-    public var clientSecret: String
-}
-
 /// Create a Perfect OAuth2 Handler with an `StORMAccessToken` generic
 ///
 /// The generic should conform to the `StORMAccessToken` protocol
@@ -224,7 +219,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                     throw OAuthError.invalidGrantType
                 }
 
-                guard let clientAuthentication = self.getClientAuthorization(from: request) else {
+                guard let clientAuthentication = ClientAuthorization(request: request) else {
                     Log.error(message: "PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
                     throw OAuthError.invalidClient
 
@@ -286,40 +281,6 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 Log.error(message: "PerfectOAuth2: error: \(error)")
             }
         }
-    }
-
-    /// Gets the client authorization from headers / post request
-    ///
-    /// - Parameter request: HTTPRequest
-    /// - Returns: Optional ClientAuthorization
-    public func getClientAuthorization(from request: HTTPRequest) -> ClientAuthorization? {
-        // client_id and client_secret are send through 'Authorization: Basic <base64_encdode>' header
-        if let authorization = request.header(.authorization) {
-            let authorizationBasic = authorization.components(separatedBy: " ")
-            guard let base64EncodedString = authorizationBasic.last,
-                authorizationBasic.count == 2,
-                authorizationBasic.first == TokenType.basic.rawValue,
-                let base64EncodedData = Data(base64Encoded: base64EncodedString),
-                let base64DecodedString = String(data: base64EncodedData, encoding: .utf8) else {
-                    Log.error(message: "PerfectOAuth2: Missing 'Authorization: Basic <base64_encoded>' header")
-                    return nil
-            }
-
-            let keySecretArray = base64DecodedString.components(separatedBy: ":")
-            guard keySecretArray.count == 2,
-                let clientID = keySecretArray.first,
-                let clientSecret = keySecretArray.last else {
-                    return nil
-            }
-
-            return ClientAuthorization(clientID: clientID, clientSecret: clientSecret)
-
-            // client_id and client_secret are send through regular post/get values
-        } else if let clientID = request.param(name: "client_id"), let clientSecret = request.param(name: "client_secret") {
-            LogFile.debug("PerfectOAuth2: Checking client_id and client_secret from POST request parameters")
-            return ClientAuthorization(clientID: clientID, clientSecret: clientSecret)
-        }
-        return nil
     }
 
     fileprivate func authorize(refreshToken: String) throws -> T {
