@@ -104,12 +104,12 @@ extension HTTPResponse {
         self.completed()
     }
 
-    public func `throw`(from status: HTTPResponseStatus) {
+    public func `throw`(from status: HTTPResponseStatus, message:String?=nil) {
         let jsonResponse: [String: Any] = [
             "status": "error",
             "data": [
                 "code": status.code,
-                "message": status.description
+                "message": message ?? status.description
             ]
         ]
         self.status = status

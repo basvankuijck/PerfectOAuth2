@@ -29,8 +29,8 @@ let oauthHandler = PerfectOAuth2<AccessToken>()
 
 func loginHandler(data: [String:Any]) throws -> RequestHandler {
     return try oauthHandler.handleAuthorization(data: data,
-               authClosure: { (grantType, clientID, clientSecret) -> Bool in
-        return clientID == "id" && clientSecret == "secret"
+               authClosure: { clientAuthorization -> Bool in
+        return clientAuthorization.clientID == "id" && clientAuthorization.clientSecret == "secret"
         
     }) { (username, password) -> Int? in
         // Validate the user.
