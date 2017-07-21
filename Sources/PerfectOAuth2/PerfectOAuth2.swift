@@ -229,7 +229,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     ///   - userClosure: The closure to be called to verify a specific username and password. Return the `userID` if succesful, otherwise return `nil`. (Optional). Only used for `password` grant_types
     /// - Returns: The actual `Perfect.RequestHandler`
     /// - Throws: See `OAuthError`
-    open func handleAuthorization(data: [String:Any], authClosure: @escaping ((_ clientAuthentication: ClientAuthorization) -> Bool), userClosure: ((_ username: String, _ password: String) -> Int?)?=nil) throws -> RequestHandler {
+    open func handleAuthorization(data: [String:Any]?=nil, authClosure: @escaping ((_ clientAuthentication: ClientAuthorization) -> Bool), userClosure: ((_ username: String, _ password: String) -> Int?)?=nil) -> RequestHandler {
         return {
             request, response in
             
