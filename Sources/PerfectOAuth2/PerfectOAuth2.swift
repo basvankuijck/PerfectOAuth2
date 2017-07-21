@@ -12,7 +12,6 @@ import PerfectHTTPServer
 import Foundation
 import PerfectLogger
 import StORM
-import PerfectRepeater
 
 
 /// How should refreshtoken cycles be handled?
@@ -90,10 +89,6 @@ open class PerfectOAuth2<T: StORMAccessToken> {
         LogFile.info("PerfectOAuth2 initialized")
         try? T.init().setup("")
         clearExpiredRefreshTokens()
-        Repeater.exec(timer: 60 * 60 * 24) {
-            self.clearExpiredRefreshTokens()
-            return true
-        }
     }
 
     /// See `RefreshTokenCycle`
