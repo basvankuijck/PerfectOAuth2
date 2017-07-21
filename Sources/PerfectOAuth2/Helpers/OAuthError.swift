@@ -84,6 +84,7 @@ public enum OAuthError: Error {
     public var httpResponseStatus: HTTPResponseStatus {
         switch (self) {
         case .accessDenied, .invalidAccessToken: return .unauthorized
+        case .invalidScope: return .methodNotAllowed
         default: return .badRequest
         }
     }
