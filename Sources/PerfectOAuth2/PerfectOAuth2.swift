@@ -12,6 +12,7 @@ import PerfectHTTPServer
 import Foundation
 import PerfectLogger
 import StORM
+import PerfectRepeater
 
 
 /// How should refreshtoken cycles be handled?
@@ -88,6 +89,11 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     public init() {
         LogFile.info("PerfectOAuth2 initialized")
         try? T.init().setup("")
+        clearExpiredRefreshTokens()
+        Repeater.exec(timer: 60 * 60 * 24) {
+            self.clearExpiredRefreshTokens()
+            return true
+        }
     }
 
     /// See `RefreshTokenCycle`
@@ -159,12 +165,12 @@ open class PerfectOAuth2<T: StORMAccessToken> {
         do {
             try accessToken.find(findObj)
             if accessToken.id == 0 {
-                Log.error(message: "PerfectOAuth2: Cannot find access_token '\(accessTokenString)'")
+                LogFile.error("PerfectOAuth2: Cannot find access_token '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
             if let scopes = scopes {
                 if !accessToken.has(scopes: scopes) {
-                    Log.error(message: "PerfectOAuth2: \(String(describing: accessToken)) does not have the correct scopes: \(scopes)")
+                    LogFile.error("PerfectOAuth2: \(String(describing: accessToken)) does not have the correct scopes: \(scopes)")
                     throw OAuthError.invalidScope(scopes)
                 }
             }
@@ -173,10 +179,10 @@ open class PerfectOAuth2<T: StORMAccessToken> {
             if accessToken.accessTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970
                 || accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
                 if accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
-                    Log.error(message: "PerfectOAuth2: refresh_token is expired")
+                    LogFile.error("PerfectOAuth2: refresh_token is expired")
                     try invalidate(accessToken: accessToken)
                 }
-                Log.warning(message: "PerfectOAuth2: access_token is expired '\(accessTokenString)'")
+                LogFile.warning("PerfectOAuth2: access_token is expired '\(accessTokenString)'")
                 throw OAuthError.invalidAccessToken
             }
 
@@ -189,7 +195,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
             }
             return accessToken
         } catch let error {
-            Log.error(message: "PerfectOAuth2: Authorize error: \(error)")
+            LogFile.error("PerfectOAuth2: Authorize error: \(error)")
             throw error
         }
     }
@@ -239,18 +245,18 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 }
 
                 guard let grantType = OAuthGrantType(rawValue: grantTypeString) else {
-                    Log.error(message: "PerfectOAuth2: Invalid grant_type: \(grantTypeString)")
+                    LogFile.error("PerfectOAuth2: Invalid grant_type: \(grantTypeString)")
                     throw OAuthError.invalidGrantType
                 }
 
                 guard let clientAuthentication = ClientAuthorization(request: request) else {
-                    Log.error(message: "PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
+                    LogFile.error("PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
                     throw OAuthError.invalidClient
 
                 }
                 LogFile.debug("PerfectOAuth2: Checking client_id and client_secret from 'Authorization' header")
                 if authClosure(clientAuthentication) == false {
-                    Log.error(message: "PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
+                    LogFile.error("PerfectOAuth2: client_id and/or client_secret are invalid / unknown")
                     throw OAuthError.invalidClient
                 }
 
@@ -267,7 +273,7 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                             throw OAuthError.missingParameters(["username", "password"])
                     }
                     guard let tuserID = userClosure?(username, password) else {
-                        Log.error(message: "PerfectOAuth2: Invalid username (\(username)) and/or password (***)")
+                        LogFile.error("PerfectOAuth2: Invalid username (\(username)) and/or password (***)")
                         throw OAuthError.invalidUsernamePassword
                     }
                     userID = tuserID
@@ -316,10 +322,10 @@ open class PerfectOAuth2<T: StORMAccessToken> {
                 
                 response.completed()
             } catch let error as OAuthError {
-                Log.error(message: "PerfectOAuth2: error: \(error)")
+                LogFile.error("PerfectOAuth2: error: \(error)")
                 response.throw(with: error)
             } catch let error {
-                Log.error(message: "PerfectOAuth2: error: \(error)")
+                LogFile.error("PerfectOAuth2: error: \(error)")
             }
         }
     }
@@ -334,13 +340,13 @@ open class PerfectOAuth2<T: StORMAccessToken> {
         do {
             try accessToken.find(findObj)
             if accessToken.id == 0 {
-                Log.error(message: "PerfectOAuth2: Cannot find an access_token with the refresh_token \(refreshToken)")
+                LogFile.error("PerfectOAuth2: Cannot find an access_token with the refresh_token \(refreshToken)")
                 throw OAuthError.invalidRefreshToken
             }
             let now = Date()
             if accessToken.refreshTokenExpirationDate.timeIntervalSince1970 < now.timeIntervalSince1970 {
                 try invalidate(accessToken: accessToken)
-                Log.error(message: "PerfectOAuth2: refresh_token is expired")
+                LogFile.error("PerfectOAuth2: refresh_token is expired")
                 throw OAuthError.invalidRefreshToken
             }
             return accessToken
@@ -356,5 +362,25 @@ open class PerfectOAuth2<T: StORMAccessToken> {
     public func invalidate(accessToken: T) throws {
         LogFile.debug("PerfectOAuth2: Invalidate access_token \(accessToken.accessToken)")
         try accessToken.delete()
+    }
+
+
+    /// Clears all the access_tokens where the refresh_tokens have expired
+    public func clearExpiredRefreshTokens() {
+        LogFile.debug("Clearing expired refresh_tokens...")
+        do {
+            let accessToken = T.init()
+            try accessToken.findAll()
+            let date = Date()
+            for row in accessToken.results.rows {
+                let token = T.init()
+                token.to(row)
+                if token.refreshTokenExpirationDate.timeIntervalSince1970 < date.timeIntervalSince1970 {
+                    try token.delete()
+                }
+            }
+        } catch let error {
+            LogFile.error("Error clearing expired refresh tokens: \(String(describing: error))")
+        }
     }
 }

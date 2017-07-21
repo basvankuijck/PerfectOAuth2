@@ -15,6 +15,7 @@ public protocol StORMConvenience: class, StORMProtocol {
     var results: StORMResultSet { get set }
     func setup(_ str: String) throws
 
+    func findAll() throws
     func find(_ data: [String: Any]) throws
     func find(_ data: [(String, Any)]) throws
 
